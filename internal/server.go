@@ -1,4 +1,4 @@
-package server
+package internal
 
 import (
 	"bufio"
@@ -43,6 +43,7 @@ func HandleConnection(conn net.Conn) {
 			break
 		}
 
-		fmt.Printf("Message: %s\n", message)
+		fmt.Printf("Processing: %s\n", message)
+		ProcessCommand(message)
 	}
 }

@@ -1,9 +1,9 @@
 package main
 
 import (
-	server "github.com/CodeForBeauty/GoRedis/internal"
+	internal "github.com/CodeForBeauty/GoRedis/internal"
 )
 
 func main() {
-	server.StartServer(8080)
+	internal.StartServer(8080)
 }
