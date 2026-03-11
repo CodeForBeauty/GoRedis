@@ -7,102 +7,101 @@ import (
 	"time"
 )
 
-var db *DB = MakeDB()
+type DBServer struct {
+	db DB
+}
 
-func ProcessCommand(command string) (string, error) {
+func MakeServer() *DBServer {
+	return &DBServer{db: *MakeDB()}
+}
+
+func (s *DBServer) ProcessCommand(command string) (string, error) {
 	args := strings.Split(command, " ")
 
 	if len(args) < 2 {
-		return "", errors.New("Not enough arguments for command")
+		return "", errors.New("Not enough arguments for a command")
 	}
 
-	key := args[1]
-	var secondArg string
-	if len(args) > 2 {
-		secondArg = args[2]
-	}
-	var thirdArg string
-	if len(args) > 3 {
-		thirdArg = args[3]
-	}
-
-	switch args[0] {
-	case "GET":
-		return Get(key)
-	case "SET":
-		Set(key, secondArg, 10000)
-	case "LAPP":
-		AppendList(key, secondArg)
-	case "LREM":
-		RemoveFromList(key, secondArg)
-	case "LRAN":
-		start, err := strconv.Atoi(secondArg)
-		if err != nil {
-			return "", err
-		}
-		var end int
-		end, err = strconv.Atoi(thirdArg)
-		if err != nil {
-			return "", err
-		}
-		l, err := RangeList(key, start, end)
-		if err != nil {
-			return "", err
-		}
-		tmp := "L " + strings.Join(l, ",")
-		return tmp, nil
-	case "HSET":
-		SetHash(key, secondArg, thirdArg)
-	case "HGET":
-		return GetHash(key, secondArg)
+	var commands = map[string]func([]string) (string, error){
+		"GET":    s.Get,
+		"SET":    s.Set,
+		"LPUSH":  s.AppendList,
+		"LREM":   s.RemoveFromList,
+		"LRANGE": s.RangeList,
+		"HGET":   s.GetHash,
+		"HSET":   s.SetHash,
 	}
 
-	return "", nil
+	comm := args[0]
+
+	cmd, found := commands[comm]
+	if !found {
+		return "", errors.New("Command not found")
+	}
+
+	return cmd(args[1:])
 }
 
-func getValue[T Value](key string) (T, error) {
+func getValue[T Value](db DB, key string) (T, error) {
 	tmpVal, found := db.Get(key)
 	var zero T
 	if !found {
 		return zero, errors.New("Key doesn't exist")
 	}
-	if tmpVal.GetType() != zero.GetType() {
-		return zero, errors.New("Wrong entry type")
-	}
 	val, ok := tmpVal.(T)
 	if !ok {
-		return zero, errors.New("Failed to cast Value to ListValue")
+		return zero, errors.New("Type cast failed")
 	}
 	return val, nil
 }
 
-func Get(key string) (string, error) {
-	val, err := getValue[*StringValue](key)
+func (s *DBServer) Get(args []string) (string, error) {
+	if len(args) < 1 {
+		return "", errors.New("Not enough arguments")
+	}
+	key := args[0]
+	val, err := getValue[*StringValue](s.db, key)
 	if err != nil {
 		return "", err
 	}
 	return val.Data, nil
 }
 
-func Set(key string, value string, expiration int) error {
+func (s *DBServer) Set(args []string) (string, error) {
+	if len(args) < 3 {
+		return "", errors.New("Not enough arguments")
+	}
+	key, value, exp := args[0], args[1], args[2]
+	expiration, err := strconv.Atoi(exp)
+	if err != nil {
+		return "", err
+	}
 	tmp := &StringValue{Data: value}
-	db.Set(key, tmp, time.Now().Add(time.Duration(expiration)*time.Millisecond))
-	return nil
+	s.db.Set(key, tmp, time.Now().Add(time.Duration(expiration)*time.Second))
+	return "", nil
 }
 
-func AppendList(key string, value string) error {
-	val, err := getValue[*ListValue](key)
+func (s *DBServer) AppendList(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", errors.New("Not enough arguments")
+	}
+	key, value := args[0], args[1]
+	val, err := getValue[*ListValue](s.db, key)
 	if err != nil {
-		return err
+		return "", err
 	}
 	val.Data = append(val.Data, value)
-	return nil
+	return "", nil
 }
 
-func RemoveFromList(key string, value string) error {
-	val, err := getValue[*ListValue](key)
+func (s *DBServer) RemoveFromList(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", errors.New("Not enough arguments")
+	}
+	key, value := args[0], args[1]
+	val, err := getValue[*ListValue](s.db, key)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var idx int = -1
 	for i := range val.Data {
@@ -111,29 +110,62 @@ func RemoveFromList(key string, value string) error {
 			break
 		}
 	}
-	val.Data = append(val.Data[idx:], val.Data[:idx+1]...)
-	return nil
-}
-
-func RangeList(key string, start int, end int) ([]string, error) {
-	val, err := getValue[*ListValue](key)
-	if err != nil {
-		return nil, err
+	if idx == -1 {
+		return "", errors.New("Value not found in list")
 	}
-	return val.Data[start:end], nil
+	val.Data = append(val.Data[:idx], val.Data[idx+1:]...)
+	return "", nil
 }
 
-func SetHash(key string, hash string, value string) error {
-	val, err := getValue[*HashValue](key)
+func (s *DBServer) RangeList(args []string) (string, error) {
+	if len(args) < 3 {
+		return "", errors.New("Not enough arguments")
+	}
+	key, begin, end := args[0], args[1], args[2]
+
+	start, err := strconv.Atoi(begin)
 	if err != nil {
-		return err
+		return "", err
+	}
+	stop, err := strconv.Atoi(end)
+	if err != nil {
+		return "", err
+	}
+
+	val, err := getValue[*ListValue](s.db, key)
+	if err != nil {
+		return "", err
+	}
+
+	if start < 0 || start >= len(val.Data) || stop < start || stop >= len(val.Data) {
+		return "", errors.New("Out of bounds index")
+	}
+
+	tmpSlice := val.Data[start:stop]
+	return "$ " + strings.Join(tmpSlice, ","), nil
+}
+
+func (s *DBServer) SetHash(args []string) (string, error) {
+	if len(args) < 3 {
+		return "", errors.New("Not enough arguments")
+	}
+	key, hash, value := args[0], args[1], args[2]
+
+	val, err := getValue[*HashValue](s.db, key)
+	if err != nil {
+		return "", err
 	}
 	val.Data[hash] = value
-	return nil
+	return "", nil
 }
 
-func GetHash(key string, hash string) (string, error) {
-	val, err := getValue[*HashValue](key)
+func (s *DBServer) GetHash(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", errors.New("Not enough arguments")
+	}
+	key, hash := args[0], args[1]
+
+	val, err := getValue[*HashValue](s.db, key)
 	if err != nil {
 		return "", err
 	}

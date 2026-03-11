@@ -11,11 +11,13 @@ var toProcess = make(chan struct {
 }, 5)
 
 func RunProcessor() {
+	dbServer := MakeServer()
+
 	for {
 		command := <-toProcess
 
 		fmt.Printf("Processing: %s\n", command.message)
-		output, err := ProcessCommand(command.message)
+		output, err := dbServer.ProcessCommand(command.message)
 		if err == nil && output != "" {
 			command.connection.Write([]byte(output))
 		}
