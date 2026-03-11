@@ -19,19 +19,16 @@ func TestSetGetStringValue(t *testing.T) {
 
 	if !found {
 		t.Error("Key not added")
-		return
 	}
 
 	strVal, ok := val.(*internal.StringValue)
 
 	if !ok {
 		t.Error("Type cast filed")
-		return
 	}
 
 	if strVal.Data != value {
 		t.Error("Incorrect value")
-		return
 	}
 }
 
@@ -71,7 +68,6 @@ func TestLRUEviction(t *testing.T) {
 
 	if db.Len() != 4 {
 		t.Error("Key not removed or added")
-		return
 	}
 
 	_, found := db.Get(firstKey)

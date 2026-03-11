@@ -153,7 +153,7 @@ func (s *DBServer) RangeList(args []string) (string, error) {
 		return "", err
 	}
 
-	if start < 0 || start >= len(val.Data) || stop < start || stop >= len(val.Data) {
+	if start < 0 || start > len(val.Data) || stop < start || stop > len(val.Data) {
 		return "", errors.New("Out of bounds index")
 	}
 
@@ -168,7 +168,7 @@ func (s *DBServer) SetHash(args []string) (string, error) {
 	key, hash, value := args[0], args[1], args[2]
 
 	if _, ok := s.db.data[key]; !ok {
-		s.db.Set(key, &HashValue{}, time.Now().Add(time.Duration(30)*time.Minute))
+		s.db.Set(key, &HashValue{Data: map[string]string{}}, time.Now().Add(time.Duration(30)*time.Minute))
 	}
 	val, err := getValue[*HashValue](s.db, key)
 	if err != nil {
