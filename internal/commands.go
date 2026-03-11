@@ -43,6 +43,9 @@ func (s *DBServer) ProcessCommand(command string) (string, error) {
 		"HGET":   s.GetHash,
 		"HSET":   s.SetHash,
 		"EXPIR":  s.ChangeExpiration,
+		"SPUSH":  s.AppendSet,
+		"SREM":   s.RemoveFromSet,
+		"SHAS":   s.HasSet,
 	}
 
 	comm := args[0]
@@ -210,4 +213,51 @@ func (s *DBServer) ChangeExpiration(args []string) (string, error) {
 	entry.expiration = time.Now().Add(time.Duration(expiration) * time.Minute)
 
 	return "", nil
+}
+
+func (s *DBServer) AppendSet(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", WRONG_ARGUMENT_COUNT_ERROR
+	}
+	key, value := args[0], args[1]
+	if _, ok := s.db.data[key]; !ok {
+		s.db.Set(key, &SetValue{Data: map[string]bool{}}, time.Now().Add(time.Duration(30)*time.Minute))
+	}
+
+	val, err := getValue[*SetValue](s.db, key)
+	if err != nil {
+		return "", err
+	}
+	val.Data[value] = true
+	return "", nil
+}
+
+func (s *DBServer) RemoveFromSet(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", WRONG_ARGUMENT_COUNT_ERROR
+	}
+	key, value := args[0], args[1]
+
+	val, err := getValue[*SetValue](s.db, key)
+	if err != nil {
+		return "", err
+	}
+	delete(val.Data, value)
+	return "", nil
+}
+
+func (s *DBServer) HasSet(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", WRONG_ARGUMENT_COUNT_ERROR
+	}
+	key, value := args[0], args[1]
+
+	val, err := getValue[*SetValue](s.db, key)
+	if err != nil {
+		return "", err
+	}
+	if _, ok := val.Data[value]; ok {
+		return "1", nil
+	}
+	return "0", nil
 }

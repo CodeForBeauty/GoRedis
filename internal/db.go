@@ -8,6 +8,7 @@ const (
 	TYPE_STRING ValueType = iota
 	TYPE_LIST
 	TYPE_HASH
+	TYPE_SET
 )
 
 type Value interface {
@@ -138,4 +139,16 @@ func (h *HashValue) GetSize() int {
 		size += len(h.Data[i])
 	}
 	return size
+}
+
+type SetValue struct {
+	Data map[string]bool
+}
+
+func (h *SetValue) GetType() ValueType {
+	return TYPE_SET
+}
+
+func (h *SetValue) GetSize() int {
+	return len(h.Data)
 }

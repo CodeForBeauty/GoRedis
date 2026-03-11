@@ -135,3 +135,39 @@ func TestExpiration(t *testing.T) {
 		t.Error("Wrong value")
 	}
 }
+
+func TestSets(t *testing.T) {
+	var dbServer = internal.MakeServer()
+
+	key := "test"
+
+	value := "50"
+
+	_, err := dbServer.ProcessCommand(fmt.Sprintf("SPUSH %s %s", key, value))
+	if err != nil {
+		t.Error("Failed to push to set: ", err)
+	}
+
+	output, err := dbServer.ProcessCommand(fmt.Sprintf("SHAS %s %s", key, value))
+	if err != nil {
+		t.Error("Failed to check set: ", err)
+	}
+
+	if output != "1" {
+		t.Error("Wrong set check value")
+	}
+
+	_, err = dbServer.ProcessCommand(fmt.Sprintf("SREM %s %s", key, value))
+	if err != nil {
+		t.Error("Failed to remove from set: ", err)
+	}
+
+	output, err = dbServer.ProcessCommand(fmt.Sprintf("SHAS %s %s", key, value))
+	if err != nil {
+		t.Error("Failed to check set: ", err)
+	}
+
+	if output != "0" {
+		t.Error("Wrong set check value")
+	}
+}
