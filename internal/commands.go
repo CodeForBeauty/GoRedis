@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+var (
+	KEY_NOT_FOUND_ERROR        = errors.New("Key doesn't exist")
+	TYPE_CAST_ERROR            = errors.New("Type cast failed")
+	WRONG_ARGUMENT_COUNT_ERROR = errors.New("Not enough arguments")
+	COMMAND_NOT_FOUND_ERROR    = errors.New("Command not found")
+	LIST_NOT_FOUND_ERROR       = errors.New("Value not found in list")
+)
+
 type DBServer struct {
 	db DB
 }
@@ -19,7 +27,7 @@ func (s *DBServer) ProcessCommand(command string) (string, error) {
 	args := strings.Split(command, " ")
 
 	if len(args) < 2 {
-		return "", errors.New("Not enough arguments for a command")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 
 	var commands = map[string]func([]string) (string, error){
@@ -36,7 +44,7 @@ func (s *DBServer) ProcessCommand(command string) (string, error) {
 
 	cmd, found := commands[comm]
 	if !found {
-		return "", errors.New("Command not found")
+		return "", COMMAND_NOT_FOUND_ERROR
 	}
 
 	return cmd(args[1:])
@@ -46,18 +54,18 @@ func getValue[T Value](db DB, key string) (T, error) {
 	tmpVal, found := db.Get(key)
 	var zero T
 	if !found {
-		return zero, errors.New("Key doesn't exist")
+		return zero, KEY_NOT_FOUND_ERROR
 	}
 	val, ok := tmpVal.(T)
 	if !ok {
-		return zero, errors.New("Type cast failed")
+		return zero, TYPE_CAST_ERROR
 	}
 	return val, nil
 }
 
 func (s *DBServer) Get(args []string) (string, error) {
 	if len(args) < 1 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key := args[0]
 	val, err := getValue[*StringValue](s.db, key)
@@ -69,7 +77,7 @@ func (s *DBServer) Get(args []string) (string, error) {
 
 func (s *DBServer) Set(args []string) (string, error) {
 	if len(args) < 3 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key, value, exp := args[0], args[1], args[2]
 	expiration, err := strconv.Atoi(exp)
@@ -83,9 +91,12 @@ func (s *DBServer) Set(args []string) (string, error) {
 
 func (s *DBServer) AppendList(args []string) (string, error) {
 	if len(args) < 2 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key, value := args[0], args[1]
+	if _, ok := s.db.data[key]; !ok {
+		s.db.Set(key, &ListValue{}, time.Now().Add(time.Duration(30)*time.Minute))
+	}
 	val, err := getValue[*ListValue](s.db, key)
 	if err != nil {
 		return "", err
@@ -96,7 +107,7 @@ func (s *DBServer) AppendList(args []string) (string, error) {
 
 func (s *DBServer) RemoveFromList(args []string) (string, error) {
 	if len(args) < 2 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key, value := args[0], args[1]
 	val, err := getValue[*ListValue](s.db, key)
@@ -111,7 +122,7 @@ func (s *DBServer) RemoveFromList(args []string) (string, error) {
 		}
 	}
 	if idx == -1 {
-		return "", errors.New("Value not found in list")
+		return "", LIST_NOT_FOUND_ERROR
 	}
 	val.Data = append(val.Data[:idx], val.Data[idx+1:]...)
 	return "", nil
@@ -119,20 +130,20 @@ func (s *DBServer) RemoveFromList(args []string) (string, error) {
 
 func (s *DBServer) RangeList(args []string) (string, error) {
 	if len(args) < 3 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key, begin, end := args[0], args[1], args[2]
+
+	val, err := getValue[*ListValue](s.db, key)
+	if err != nil {
+		return "", err
+	}
 
 	start, err := strconv.Atoi(begin)
 	if err != nil {
 		return "", err
 	}
 	stop, err := strconv.Atoi(end)
-	if err != nil {
-		return "", err
-	}
-
-	val, err := getValue[*ListValue](s.db, key)
 	if err != nil {
 		return "", err
 	}
@@ -147,10 +158,13 @@ func (s *DBServer) RangeList(args []string) (string, error) {
 
 func (s *DBServer) SetHash(args []string) (string, error) {
 	if len(args) < 3 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key, hash, value := args[0], args[1], args[2]
 
+	if _, ok := s.db.data[key]; !ok {
+		s.db.Set(key, &HashValue{}, time.Now().Add(time.Duration(30)*time.Minute))
+	}
 	val, err := getValue[*HashValue](s.db, key)
 	if err != nil {
 		return "", err
@@ -161,7 +175,7 @@ func (s *DBServer) SetHash(args []string) (string, error) {
 
 func (s *DBServer) GetHash(args []string) (string, error) {
 	if len(args) < 2 {
-		return "", errors.New("Not enough arguments")
+		return "", WRONG_ARGUMENT_COUNT_ERROR
 	}
 	key, hash := args[0], args[1]
 

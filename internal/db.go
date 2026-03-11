@@ -34,6 +34,10 @@ func (d *DB) Set(key string, value Value, expiration time.Time) {
 func (d *DB) Get(key string) (Value, bool) {
 	tmp, found := d.data[key]
 	if found {
+		if time.Until(tmp.expiration) <= 0 {
+			delete(d.data, key)
+			return nil, false
+		}
 		return tmp.value, found
 	}
 	return nil, found

@@ -18,8 +18,12 @@ func RunProcessor() {
 
 		fmt.Printf("Processing: %s\n", command.message)
 		output, err := dbServer.ProcessCommand(command.message)
-		if err == nil && output != "" {
+		if err != nil {
+			command.connection.Write([]byte("FAILED"))
+		} else if output != "" {
 			command.connection.Write([]byte(output))
+		} else {
+			command.connection.Write([]byte("OK"))
 		}
 	}
 }
