@@ -9,11 +9,11 @@ import (
 
 var db *DB = MakeDB()
 
-func ProcessCommand(command string) error {
+func ProcessCommand(command string) (string, error) {
 	args := strings.Split(command, " ")
 
 	if len(args) < 2 {
-		return errors.New("Not enough arguments for command")
+		return "", errors.New("Not enough arguments for command")
 	}
 
 	key := args[1]
@@ -28,7 +28,7 @@ func ProcessCommand(command string) error {
 
 	switch args[0] {
 	case "GET":
-		Get(key)
+		return Get(key)
 	case "SET":
 		Set(key, secondArg, 10000)
 	case "LAPP":
@@ -38,36 +38,39 @@ func ProcessCommand(command string) error {
 	case "LRAN":
 		start, err := strconv.Atoi(secondArg)
 		if err != nil {
-			return err
+			return "", err
 		}
 		var end int
 		end, err = strconv.Atoi(thirdArg)
 		if err != nil {
-			return err
+			return "", err
 		}
-		RangeList(key, start, end)
+		l, err := RangeList(key, start, end)
+		if err != nil {
+			return "", err
+		}
+		tmp := "L " + strings.Join(l, ",")
+		return tmp, nil
 	case "HSET":
 		SetHash(key, secondArg, thirdArg)
 	case "HGET":
-		GetHash(key, secondArg)
+		return GetHash(key, secondArg)
 	}
 
-	return nil
+	return "", nil
 }
 
 func getValue[T Value](key string) (T, error) {
 	tmpVal, found := db.Get(key)
+	var zero T
 	if !found {
-		var zero T
 		return zero, errors.New("Key doesn't exist")
 	}
-	if tmpVal.GetType() != TYPE_LIST {
-		var zero T
+	if tmpVal.GetType() != zero.GetType() {
 		return zero, errors.New("Wrong entry type")
 	}
 	val, ok := tmpVal.(T)
 	if !ok {
-		var zero T
 		return zero, errors.New("Failed to cast Value to ListValue")
 	}
 	return val, nil
@@ -75,7 +78,10 @@ func getValue[T Value](key string) (T, error) {
 
 func Get(key string) (string, error) {
 	val, err := getValue[*StringValue](key)
-	return val.Data, err
+	if err != nil {
+		return "", err
+	}
+	return val.Data, nil
 }
 
 func Set(key string, value string, expiration int) error {

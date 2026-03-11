@@ -15,6 +15,8 @@ func StartServer(port int) error {
 		return err
 	}
 
+	go RunProcessor()
+
 	defer listener.Close()
 
 	for {
@@ -43,7 +45,11 @@ func HandleConnection(conn net.Conn) {
 			break
 		}
 
-		fmt.Printf("Processing: %s\n", message)
-		ProcessCommand(message)
+		message = message[:len(message)-1]
+
+		toProcess <- struct {
+			message    string
+			connection net.Conn
+		}{message: message, connection: conn}
 	}
 }
