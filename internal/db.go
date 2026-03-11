@@ -92,6 +92,10 @@ func (d *DB) Remove(key string) {
 	delete(d.data, key)
 }
 
+func (d *DB) Len() int {
+	return len(d.data)
+}
+
 type StringValue struct {
 	Data string
 }
