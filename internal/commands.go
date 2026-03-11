@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	MAX_MEMORY = 2048
+)
+
 var (
 	KEY_NOT_FOUND_ERROR        = errors.New("Key doesn't exist")
 	TYPE_CAST_ERROR            = errors.New("Type cast failed")
@@ -20,11 +24,11 @@ type DBServer struct {
 }
 
 func MakeServer() *DBServer {
-	return &DBServer{db: *MakeDB()}
+	return &DBServer{db: *MakeDB(MAX_MEMORY)}
 }
 
 func (s *DBServer) ProcessCommand(command string) (string, error) {
-	args := strings.Split(command, " ")
+	args := strings.Fields(command)
 
 	if len(args) < 2 {
 		return "", WRONG_ARGUMENT_COUNT_ERROR
