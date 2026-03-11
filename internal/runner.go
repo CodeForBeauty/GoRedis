@@ -5,12 +5,10 @@ import (
 	"net"
 )
 
-var toProcess = make(chan struct {
+func RunProcessor(toProcess chan struct {
 	message    string
 	connection net.Conn
-}, 5)
-
-func RunProcessor() {
+}) {
 	dbServer := MakeServer()
 
 	for {

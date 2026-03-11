@@ -2,7 +2,9 @@ package internal
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -11,11 +13,16 @@ func StartServer(port int) error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
+	var toProcess = make(chan struct {
+		message    string
+		connection net.Conn
+	}, 5)
+
 	if err != nil {
 		return err
 	}
 
-	go RunProcessor()
+	go RunProcessor(toProcess)
 
 	defer listener.Close()
 
@@ -26,11 +33,14 @@ func StartServer(port int) error {
 			return err
 		}
 
-		go HandleConnection(connection)
+		go HandleConnection(connection, toProcess)
 	}
 }
 
-func HandleConnection(conn net.Conn) {
+func HandleConnection(conn net.Conn, toProcess chan struct {
+	message    string
+	connection net.Conn
+}) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -41,11 +51,9 @@ func HandleConnection(conn net.Conn) {
 	for {
 		message, err := reader.ReadString('\n')
 
-		if err != nil {
+		if err != nil && !errors.Is(err, io.EOF) || message == "" {
 			break
 		}
-
-		message = message[:len(message)-1]
 
 		toProcess <- struct {
 			message    string
