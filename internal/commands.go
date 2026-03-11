@@ -55,19 +55,27 @@ func ProcessCommand(command string) error {
 	return nil
 }
 
-func Get(key string) (string, error) {
+func getValue[T Value](key string) (T, error) {
 	tmpVal, found := db.Get(key)
 	if !found {
-		return "", errors.New("Key doesn't exist")
+		var zero T
+		return zero, errors.New("Key doesn't exist")
 	}
-	if (*tmpVal).GetType() != TYPE_STRING {
-		return "", errors.New("Key is not a string")
+	if tmpVal.GetType() != TYPE_LIST {
+		var zero T
+		return zero, errors.New("Wrong entry type")
 	}
-	val, ok := (*tmpVal).(*StringValue)
+	val, ok := tmpVal.(T)
 	if !ok {
-		return "", errors.New("Failed to cast Value to ListValue")
+		var zero T
+		return zero, errors.New("Failed to cast Value to ListValue")
 	}
-	return val.Data, nil
+	return val, nil
+}
+
+func Get(key string) (string, error) {
+	val, err := getValue[*StringValue](key)
+	return val.Data, err
 }
 
 func Set(key string, value string, expiration int) error {
@@ -77,32 +85,18 @@ func Set(key string, value string, expiration int) error {
 }
 
 func AppendList(key string, value string) error {
-	tmpVal, found := db.Get(key)
-	if !found {
-		return errors.New("Key doesn't exist")
-	}
-	if (*tmpVal).GetType() != TYPE_LIST {
-		return errors.New("Wrong entry type")
-	}
-	val, ok := (*tmpVal).(*ListValue)
-	if !ok {
-		return errors.New("Failed to cast Value to ListValue")
+	val, err := getValue[*ListValue](key)
+	if err != nil {
+		return err
 	}
 	val.Data = append(val.Data, value)
 	return nil
 }
 
 func RemoveFromList(key string, value string) error {
-	tmpVal, found := db.Get(key)
-	if !found {
-		return errors.New("Key doesn't exist")
-	}
-	if (*tmpVal).GetType() != TYPE_LIST {
-		return errors.New("Wrong entry type")
-	}
-	val, ok := (*tmpVal).(*ListValue)
-	if !ok {
-		return errors.New("Failed to cast Value to ListValue")
+	val, err := getValue[*ListValue](key)
+	if err != nil {
+		return err
 	}
 	var idx int = -1
 	for i := range val.Data {
@@ -116,47 +110,26 @@ func RemoveFromList(key string, value string) error {
 }
 
 func RangeList(key string, start int, end int) ([]string, error) {
-	tmpVal, found := db.Get(key)
-	if !found {
-		return nil, errors.New("Key doesn't exist")
+	val, err := getValue[*ListValue](key)
+	if err != nil {
+		return nil, err
 	}
-	if (*tmpVal).GetType() != TYPE_LIST {
-		return nil, errors.New("Wrong entry type")
-	}
-	val, ok := (*tmpVal).(*ListValue)
-	if !ok {
-		return nil, errors.New("Failed to cast Value to ListValue")
-	}
-	return val.Data, nil
+	return val.Data[start:end], nil
 }
 
 func SetHash(key string, hash string, value string) error {
-	tmpVal, found := db.Get(key)
-	if !found {
-		return errors.New("Key doesn't exist")
-	}
-	if (*tmpVal).GetType() != TYPE_HASH {
-		return errors.New("Wrong entry type")
-	}
-	val, ok := (*tmpVal).(*HashValue)
-	if !ok {
-		return errors.New("Failed to cast Value to ListValue")
+	val, err := getValue[*HashValue](key)
+	if err != nil {
+		return err
 	}
 	val.Data[hash] = value
 	return nil
 }
 
 func GetHash(key string, hash string) (string, error) {
-	tmpVal, found := db.Get(key)
-	if !found {
-		return "", errors.New("Key doesn't exist")
-	}
-	if (*tmpVal).GetType() != TYPE_HASH {
-		return "", errors.New("Wrong entry type")
-	}
-	val, ok := (*tmpVal).(*HashValue)
-	if !ok {
-		return "", errors.New("Failed to cast Value to ListValue")
+	val, err := getValue[*HashValue](key)
+	if err != nil {
+		return "", err
 	}
 	return val.Data[hash], nil
 }

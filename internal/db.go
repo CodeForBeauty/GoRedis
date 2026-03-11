@@ -15,7 +15,7 @@ type Value interface {
 }
 
 type Entry struct {
-	value      *Value
+	value      Value
 	expiration time.Time
 }
 
@@ -28,10 +28,10 @@ func MakeDB() *DB {
 }
 
 func (d *DB) Set(key string, value Value, expiration time.Time) {
-	d.data[key] = &Entry{value: &value, expiration: expiration}
+	d.data[key] = &Entry{value: value, expiration: expiration}
 }
 
-func (d *DB) Get(key string) (*Value, bool) {
+func (d *DB) Get(key string) (Value, bool) {
 	tmp, found := d.data[key]
 	if found {
 		return tmp.value, found
