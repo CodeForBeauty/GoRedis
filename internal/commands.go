@@ -38,6 +38,7 @@ func (s *DBServer) ProcessCommand(command string) (string, error) {
 		"LRANGE": s.RangeList,
 		"HGET":   s.GetHash,
 		"HSET":   s.SetHash,
+		"EXPIR":  s.ChangeExpiration,
 	}
 
 	comm := args[0]
@@ -184,4 +185,25 @@ func (s *DBServer) GetHash(args []string) (string, error) {
 		return "", err
 	}
 	return val.Data[hash], nil
+}
+
+func (s *DBServer) ChangeExpiration(args []string) (string, error) {
+	if len(args) < 2 {
+		return "", WRONG_ARGUMENT_COUNT_ERROR
+	}
+	key, exp := args[0], args[1]
+
+	expiration, err := strconv.Atoi(exp)
+	if err != nil {
+		return "", err
+	}
+
+	entry, found := s.db.data[key]
+	if !found {
+		return "", KEY_NOT_FOUND_ERROR
+	}
+
+	entry.expiration = time.Now().Add(time.Duration(expiration) * time.Minute)
+
+	return "", nil
 }
